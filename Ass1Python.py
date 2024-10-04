@@ -1,68 +1,39 @@
-## https://www.youtube.com/watch?v=32nEoxB_pNU
-## tutorial: Set Cover Problem Explained - Algorithms in Python
+## Erin Rainville - 40179308
 
+import csv
 import random
 
-POPULATION_SIZE = 300
-GENOME_LENGTH = 30
-MUTATION_RATE = 0.01
-CROSSOVER_RATE = 0.7
-GENERATIONS = 100
+## parameters
+FILE_NAME = "Ass1Input.txt"
+## hyperparameters
 
-def random_genome(length):
-    return [random.randint(0, 1) for _ in range(length)]
+# read input file and create an array of the pieces
+def read_input_file(filename):
+    pieces_list = []
+    file = open(filename)
+    for line in file.readlines():
+        fields = line.split(' ')
+        for column in fields:
+            pieces_list.append(column.strip())
+    file.close()
+    return pieces_list
 
-def init_population(population_size, genome_length):
-    return [random_genome(genome_length) for _ in range(population_size)]
+# set the initial population with random positions and orientations
+def set_initial_population(pieces_list):
+    random.shuffle(pieces_list)
+    print(pieces_list)
+    return [rotate_pieces(piece) for piece in pieces_list]
 
-def fitness(genome):
-    return sum(genome)
+# rotation: keep order and just change starting point
+def rotate_pieces(piece):
+    start = random.randint(0, len(piece) - 1)
+    rotated = ''.join(piece[(start + i) %len(piece)] for i in range(len(piece)))
+    return rotated
 
-def select_parent(population, fitness_values):
-    total_fitness = sum(fitness_values)
-    pick = random.uniform(0, total_fitness) # random pick
-    current = 0
-    for individual, fitness_value in zip(population, fitness_values):
-        current += fitness_value
-        if current > pick:
-            return individual
+# fitness test
 
-def crossover(parent1, parent2):
-    if random.random() < CROSSOVER_RATE:
-        crossover_point = random.randint(1, len(parent1) - 1)
-        return parent1[:crossover_point] + parent2[crossover_point:], parent2[:crossover_point] + parent1[crossover_point:]
-    else:
-        return parent1, parent2
-
-def mutate(genome):
-    for i in range(len(genome)):
-        if random.random() < MUTATION_RATE:
-            genome[i] = abs(genome[i] -1)
-    return genome
-
-def genetic_algorithm():
-    population = init_population(POPULATION_SIZE, GENOME_LENGTH)
-
-    for generation in range(GENERATIONS):
-        fitness_values = [fitness(genome) for genome in population]
-
-        new_population = []
-        for _ in range(POPULATION_SIZE // 2):
-            parent1 = select_parent(population, fitness_values)
-            parent2 = select_parent(population, fitness_values)
-            offspring1, offspring2 = crossover(parent1, parent2)
-            new_population.extend([mutate(offspring1), mutate(offspring2)])
-
-        population = new_population
-
-        fitness_values = [fitness(genome) for genome in population]
-        best_fitness = max(fitness_values)
-        print(f"Generation {generation}: Best Fitness = {best_fitness}")
-
-        best_index = fitness_values.index(max(fitness_values))
-        best_solution = population[best_index]
-        print(f"Best Solution: {best_solution}")
-        print(f"Best Fitness: {fitness(best_solution)}")
-
-if __name__ == '__main__':
-    genetic_algorithm()
+if __name__ == "__main__":
+    pieces = read_input_file(FILE_NAME)
+    #print(pieces)
+    population = set_initial_population(pieces)
+    print(population)
