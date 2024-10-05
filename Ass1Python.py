@@ -10,7 +10,7 @@ from typing import List, Tuple
 INPUT_FILENAME = "Ass1Input.txt"
 OUTPUT_FILENAME = "OutputFiles/Ass1Output.txt"
 ## hyperparameters
-POPULATION_SIZE = 5
+POPULATION_SIZE = 100
 
 # read input file and create an array of the pieces
 def read_input_file() -> List[str]:
@@ -47,16 +47,16 @@ def rotate_pieces(piece: str) -> str:
 def calculate_fitness(puzzle: List[str]) -> int:
     return fitness.main(puzzle)
 
-# get the winner of the fitnesses
+# get the winner of the fitness
 def get_best_fitness(puzzles_list: List[List[str]]) -> Tuple[int, List[str]]:
-    best_value = float('-inf')
-    best_puzzle = None
+    b_value = 102
+    b_puzzle = None
     for puzzle in puzzles_list:
         result = calculate_fitness(puzzle)
-        if result > best_value:
-            best_value = result
-            best_puzzle = puzzle
-    return best_value, best_puzzle
+        if result < b_value:
+            b_value = result
+            b_puzzle = puzzle
+    return b_value, b_puzzle
 
 # output
 def write_output_file(puzzle):
