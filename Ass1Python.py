@@ -1,59 +1,79 @@
 ## Erin Rainville - 40179308
 
 import random
-import subprocess
+#import subprocess
+import fitness
+from typing import List, Tuple
 
-from IPython.sphinxext.ipython_directive import OUTPUT
 
 ## parameters
 INPUT_FILENAME = "Ass1Input.txt"
-OUTPUT_FILENAME = "C:/Users/Erin/Documents/COEN6321 Machine Learning/OutputFiles/Ass1Output.txt"
-TESTER_FILENAME = "C:/Users/Erin/Documents/COEN6321 Machine Learning/tester/x64/Debug/tester.exe"
+OUTPUT_FILENAME = "OutputFiles/Ass1Output.txt"
 ## hyperparameters
+POPULATION_SIZE = 5
 
 # read input file and create an array of the pieces
-def read_input_file():
+def read_input_file() -> List[str]:
     pieces_list = []
-    file = open(INPUT_FILENAME)
-    for line in file.readlines():
-        fields = line.split(' ')
-        for column in fields:
-            pieces_list.append(column.strip())
-    file.close()
+    with open(INPUT_FILENAME) as file:
+        for line in file.readlines():
+            piece = line.split(' ')
+            for column in piece:
+                pieces_list.append(column.strip())
     return pieces_list
 
-# set the initial population with random positions and orientations
-def set_initial_population(pieces_list):
+# initial population
+    # population_size number of puzzles are generated
+    # call the set_initial_puzzle which makes puzzle random pos and orientation
+    # create the output file which check
+def set_initial_population(pieces_list: List[str]) -> List[List[str]]:
+    puzzles_list = []
+    for i in range(POPULATION_SIZE):
+        puzzles_list.append(set_initial_puzzle(pieces_list))
+    return puzzles_list
+
+# set an initial puzzle with random positions and orientations
+def set_initial_puzzle(pieces_list: List[str]) -> List[str]:
     random.shuffle(pieces_list)
-    print(pieces_list)
     return [rotate_pieces(piece) for piece in pieces_list]
 
 # rotation: keep order and just change starting point
-def rotate_pieces(piece):
+def rotate_pieces(piece: str) -> str:
     start = random.randint(0, len(piece) - 1)
-    rotated = ''.join(piece[(start + i) %len(piece)] for i in range(len(piece)))
+    rotated = ''.join(piece[(start + i) % len(piece)] for i in range(len(piece)))
     return rotated
 
-# fitness test
-def fitness_validation():
-    result = subprocess.run([TESTER_FILENAME], capture_output=True, text=True )
-    output = result.stdout
-    return int(output.split(":")[1].strip())
+# calculate fitness of a puzzle
+def calculate_fitness(puzzle: List[str]) -> int:
+    return fitness.main(puzzle)
 
+# get the winner of the fitnesses
+def get_best_fitness(puzzles_list: List[List[str]]) -> Tuple[int, List[str]]:
+    best_value = float('-inf')
+    best_puzzle = None
+    for puzzle in puzzles_list:
+        result = calculate_fitness(puzzle)
+        if result > best_value:
+            best_value = result
+            best_puzzle = puzzle
+    return best_value, best_puzzle
 
 # output
-def write_output_file(population):
+def write_output_file(puzzle):
     with open(OUTPUT_FILENAME, 'w') as file:
-        file.write('Erin Rainville - 4019308 \n')
-        for i in range(0, len(population), 8):
-            row = ' '.join(population[i:i+8])
-            file.write(row + '\n')
+        file.write('Erin Rainville - 4019308')
+        for i in range(0, len(puzzle), 8):
+            row = ' '.join(puzzle[i:i+8])
+            file.write('\n' + row)
 
 
 
 if __name__ == "__main__":
     pieces = read_input_file()
-    population = set_initial_population(pieces)
-    write_output_file(population)
-    print(population)
-    fitness_validation()
+    #print(pieces)
+    puzzles = set_initial_population(pieces)
+    best_value, best_puzzle = get_best_fitness(puzzles)
+    print(f"Best Fitness Value: {best_value}")
+    print(f"Best Puzzle: {best_puzzle}")
+    write_output_file(best_puzzle)
+
