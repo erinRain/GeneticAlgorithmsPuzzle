@@ -2,6 +2,8 @@ import random
 from deap import base, creator, tools, algorithms
 import fitness
 from typing import List, Tuple
+import math
+import time
 
 ## parameters
 INPUT_FILENAME = "Ass1Input.txt"
@@ -9,10 +11,14 @@ OUTPUT_FILENAME = "OutputFiles/Ass1Output.txt"
 ## hyperparameters
 POPULATION_SIZE = 1000
 NGEN = 100  # Number of generations
-CXPB = 0.5  # Crossover probability
-MUTPB = 0.05  # Mutation probability
+CXPB = 0.7 # Crossover probability
+MUTPB = 0.3  # Mutation probability
 BLOCK_SIZE = 4 # crossover submatrix
 TOURNAMENT_SIZE = 3 # survivor selection
+MU = 500  # Number of individuals to select for the next generation
+LAMBDA = 1000  # Number of children to produce at each generation
+STAGNATION_THRESHOLD = 5  # Number of generations to wait before increasing diversity
+DIVERSITY_RATE = 0.3  # Proportion of population to replace
 
 # read input file and create an array of the pieces
 def read_input_file() -> List[str]:
@@ -37,7 +43,7 @@ def set_initial_puzzle(pieces_list: List[str]) -> List[str]:
 
 # crossover: selects a random block within puzzle and swaps it between parents
     # aim: maintain local structures within puzzle so that matched sides are more likely to be kept together
-    # probability of crossover is set in the eaSimple algorithm
+    # probability of crossover is set in the eaMuCommaLambda algorithm
 def block_crossover(parent1, parent2):
     row_size = 8
     col_size = 8
@@ -51,10 +57,9 @@ def block_crossover(parent1, parent2):
             parent1[idx1], parent2[idx2] = parent2[idx2], parent1[idx1]
     return parent1, parent2
 
-
 # mutation: randomly replaces pieces in puzzle with a given probability MUTPB
     # selects a random piece from original pieces in Ass1Input.txt and rotates it before placing it in puzzle
-    # probability of mutation is set in the eaSimple algorithm
+    # probability of mutation is set in the eaMuCommaLambda algorithm
 def mutate_puzzle(puzzle: List[str]) -> tuple[list[str]]:
     for i in range(len(puzzle)):
         new_piece = random.choice(pieces)
@@ -68,10 +73,28 @@ def dynamic_cxpb(gen, max_gen):
 def dynamic_mutpb(gen, max_gen):
     return max(0.01, MUTPB * (1 - gen / max_gen))
 
+def dynamic_cxpb_adaptive(prev_fitness, current_fitness, cxpb):
+    if current_fitness < prev_fitness:
+        return max(0.1, cxpb * 0.9)
+    else:
+        return min(1.0, cxpb * 1.1)
+
+def dynamic_mutpb_adaptive(prev_fitness, current_fitness, mutpb):
+    if current_fitness < prev_fitness:
+        return max(0.01, mutpb * 0.9)
+    else:
+        return min(1.0, mutpb * 1.1)
+
+
 
 # calculate fitness of a puzzle
 def calculate_fitness(puzzle: List[str]) -> Tuple[int]:
     return (fitness.main(puzzle),)
+
+def increase_diversity(population, toolbox, rate):
+    num_to_replace = int(len(population) * rate)
+    new_individuals = [toolbox.individual() for _ in range(num_to_replace)]
+    population[-num_to_replace:] = new_individuals
 
 # output
 def write_output_file(puzzle):
@@ -120,8 +143,51 @@ def main():
     stats.register("min", lambda x: min(f[0] for f in x))
     stats.register("max", lambda x: max(f[0] for f in x))
 
-    pop, log = algorithms.eaSimple(pop, toolbox, cxpb=CXPB, mutpb=MUTPB, ngen=NGEN,
-                                   stats=stats, halloffame=hof, verbose=True)
+    best_fitness = None
+    previous_best_fitness = float('inf')
+    stagnation_counter = 0
+
+    for gen in range(NGEN):
+        if gen == 0:
+            cxpb = CXPB
+            mutpb = MUTPB
+        else:
+            cxpb = dynamic_cxpb_adaptive(previous_best_fitness, best_fitness, cxpb)
+            mutpb = dynamic_mutpb_adaptive(previous_best_fitness, best_fitness, mutpb)
+
+        # Normalize probabilities if their sum exceeds 1.0
+        if cxpb + mutpb > 1.0:
+            total = cxpb + mutpb
+            cxpb /= total
+            mutpb /= total
+
+
+        pop, log = algorithms.eaMuCommaLambda(pop, toolbox, mu=MU, lambda_=LAMBDA, cxpb=cxpb, mutpb=mutpb, ngen=1,
+                                              stats=stats, halloffame=hof, verbose=False)
+
+        current_best_fitness = hof[0].fitness.values[0]
+        if best_fitness is None or current_best_fitness < best_fitness:
+            best_fitness = current_best_fitness
+            stagnation_counter = 0
+        else:
+            stagnation_counter += 1
+
+        if stagnation_counter >= STAGNATION_THRESHOLD:
+            increase_diversity(pop, toolbox, DIVERSITY_RATE)
+            stagnation_counter = 0
+            print("fix stagnation")
+
+        # Ensure all individuals have their fitness values calculated
+        invalid_ind = [ind for ind in pop if not ind.fitness.valid]
+        if invalid_ind:
+            fitnesses = map(toolbox.evaluate, invalid_ind)
+            for ind, fit in zip(invalid_ind, fitnesses):
+                ind.fitness.values = fit
+
+        # Extract statistics for the current generation
+        record = stats.compile(pop)
+        print(f"Generation: {gen}, avg: {record['avg']}, min: {record['min']}, max: {record['max']}")
+        previous_best_fitness = current_best_fitness
 
     best_puzzle = hof[0]
     print(f"Best Fitness Value: {best_puzzle.fitness.values[0]}")
@@ -129,4 +195,6 @@ def main():
     write_output_file(best_puzzle)
 
 if __name__ == "__main__":
+    start_time = time.time()
     main()
+    print("Time: %s" % (time.time() - start_time))
