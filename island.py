@@ -2,29 +2,16 @@ import random
 from deap import base, creator, tools, algorithms
 import fitness
 from typing import List, Tuple
-import math
 from multiprocessing import Pool
 import time
-
 
 # Unchanging Parameters
 INPUT_FILENAME = "Ass1Input.txt"
 OUTPUT_FILENAME = "OutputFiles/Ass1Output.txt"
 POPULATION_SIZE = 1000
-NGEN = 100
-MU = 500
-LAMBDA = 1000
-
-# HyperParameteres
-CXPB = 0.7
-MUTPB = 0.3
-BLOCK_SIZE = 4
-TOURNAMENT_SIZE = 3
-STAGNATION_THRESHOLD = 5
-DIVERSITY_RATE = 0.3
-NUM_ISLANDS = 4
-MIGRATION_RATE = 0.1
-MIGRATION_INTERVAL = 10
+NGEN = 100  # Number of generations
+LAMBDA = POPULATION_SIZE  # Number of children to produce at each generation
+MU = LAMBDA//2  # Number of individuals to select for the next generation
 
 # Read input file and create an array of the pieces
 def read_input_file() -> List[str]:
@@ -48,32 +35,33 @@ def set_initial_puzzle(pieces_list: List[str]) -> List[str]:
     return [rotate_piece(piece) for piece in pieces_list]
 
 # Crossover: selects a random block within puzzle and swaps it between parents
-def block_crossover(parent1, parent2):
+def block_crossover(parent1, parent2, block_size):
     row_size = 8
     col_size = 8
-    start_row = random.randint(0, row_size - BLOCK_SIZE)
-    start_col = random.randint(0, col_size - BLOCK_SIZE)
-
-    for i in range(BLOCK_SIZE):
-        for j in range(BLOCK_SIZE):
-            idx1 = (start_row + i) * col_size + (start_col + j)
-            idx2 = (start_row + i) * col_size + (start_col + j)
-            parent1[idx1], parent2[idx2] = parent2[idx2], parent1[idx1]
+    if block_size > row_size or block_size > col_size:
+        raise ValueError(f"block_size {block_size}must be less than or equal to row_size and col_size")
+    start_row = random.randint(0, row_size - block_size)
+    start_col = random.randint(0, col_size - block_size)
+    for i in range(block_size):
+        for j in range(block_size):
+            idx = (start_row + i) * col_size + (start_col + j)
+            parent1[idx], parent2[idx] = parent2[idx], parent1[idx]
     return parent1, parent2
-
-# Mutation: randomly replaces pieces in puzzle with a given probability MUTPB
-def mutate_puzzle(puzzle: List[str]) -> tuple[list[str]]:
-    for i in range(len(puzzle)):
-        new_piece = random.choice(pieces)
-        rotated_piece = rotate_piece(new_piece)
-        puzzle[i] = rotated_piece
-    return puzzle,
 
 def dynamic_cxpb_adaptive(prev_fitness, current_fitness, cxpb):
     if current_fitness < prev_fitness:
         return max(0.1, cxpb * 0.9)
     else:
         return min(1.0, cxpb * 1.1)
+
+# Mutation: randomly replaces pieces in puzzle with a given probability MUTPB
+def mutate_puzzle(puzzle: List[str], pieces, mutpb) -> tuple[list[str]]:
+    for i in range(len(puzzle)):
+        if random.random() < mutpb:
+            new_piece = random.choice(pieces)
+            rotated_piece = rotate_piece(new_piece)
+            puzzle[i] = rotated_piece
+    return puzzle,
 
 def dynamic_mutpb_adaptive(prev_fitness, current_fitness, mutpb):
     if current_fitness < prev_fitness:
@@ -85,6 +73,7 @@ def dynamic_mutpb_adaptive(prev_fitness, current_fitness, mutpb):
 def calculate_fitness(puzzle: List[str]) -> Tuple[int]:
     return (fitness.main(puzzle),)
 
+# prevent stagnation, replace some puzzles with new puzzles
 def increase_diversity(population, toolbox, rate):
     num_to_replace = int(len(population) * rate)
     new_individuals = [toolbox.individual() for _ in range(num_to_replace)]
@@ -99,35 +88,43 @@ def write_output_file(puzzle):
             file.write('\n' + row)
 
 # DEAP setup, get all puzzle pieces available
-pieces = read_input_file()
+def set_deap_framework(block_size, tournament_size, mutpb):
+    pieces = read_input_file()
 
-# Set up type
-creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
-creator.create("Individual", list, fitness=creator.FitnessMin)
+    # Set up type
+    if hasattr(creator, 'FitnessMin'):
+        del creator.FitnessMin
+    if hasattr(creator, 'Individual'):
+        del creator.Individual
+    creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
+    creator.create("Individual", list, fitness=creator.FitnessMin)
 
-# Initialization
-toolbox = base.Toolbox()
-toolbox.register("attr_puzzle", set_initial_puzzle, pieces)
-toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.attr_puzzle)
-toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+    # Initialization
+    toolbox = base.Toolbox()
+    toolbox.register("attr_puzzle", set_initial_puzzle, pieces)
+    toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.attr_puzzle)
+    toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-# Operators
-toolbox.register("evaluate", calculate_fitness)
-toolbox.register("mate", block_crossover)
-toolbox.register("mutate", mutate_puzzle)
-toolbox.register("select", tools.selTournament, tournsize=TOURNAMENT_SIZE)
+    # Operators
+    toolbox.register("evaluate", calculate_fitness)
+    toolbox.register("mate", block_crossover, block_size = block_size)
+    toolbox.register("mutate", mutate_puzzle, pieces = pieces, mutpb = mutpb)
+    toolbox.register("select", tools.selTournament, tournsize=tournament_size)
+
+    return toolbox
 
 def migrate(populations, migration_rate):
     num_migrants = int(len(populations) * migration_rate)
     for i in range(len(populations)):
         next_island = (i + 1) % len(populations)
         migrants = random.sample(populations[i], num_migrants)
-        populations[next_island][0].extend(migrants)
+        populations[next_island].extend(migrants)
         populations[i] = [ind for ind in populations[i] if ind not in migrants]
 
-def run_island(toolbox, ngen, cxpb, mutpb, island_id):
-    pop = toolbox.population(n=POPULATION_SIZE // NUM_ISLANDS)
+def run_island(toolbox, ngen, cxpb, mutpb, island_id, num_islands, stagnation_threshold, diversity_rate, migration_interval):
+    pop = toolbox.population(n=POPULATION_SIZE // num_islands)
     hof = tools.HallOfFame(1)
+
     stats = tools.Statistics(lambda ind: ind.fitness.values)
     stats.register("avg", lambda x: sum(f[0] for f in x) / len(x))
     stats.register("min", lambda x: min(f[0] for f in x))
@@ -139,12 +136,11 @@ def run_island(toolbox, ngen, cxpb, mutpb, island_id):
 
     for gen in range(ngen):
         if gen == 0:
-            cxpb = CXPB
-            mutpb = MUTPB
+            cxpb = cxpb
+            mutpb = mutpb
         else:
             cxpb = dynamic_cxpb_adaptive(previous_best_fitness, best_fitness, cxpb)
             mutpb = dynamic_mutpb_adaptive(previous_best_fitness, best_fitness, mutpb)
-
         # Normalize probabilities if their sum exceeds 1.0
         if cxpb + mutpb > 1.0:
             total = cxpb + mutpb
@@ -155,14 +151,17 @@ def run_island(toolbox, ngen, cxpb, mutpb, island_id):
                                               stats=stats, halloffame=hof, verbose=False)
 
         current_best_fitness = hof[0].fitness.values[0]
+        if current_best_fitness == 0: # termination
+            break
+
         if best_fitness is None or current_best_fitness < best_fitness:
             best_fitness = current_best_fitness
             stagnation_counter = 0
         else:
             stagnation_counter += 1
 
-        if stagnation_counter >= STAGNATION_THRESHOLD:
-            increase_diversity(pop, toolbox, DIVERSITY_RATE)
+        if stagnation_counter >= stagnation_threshold:
+            increase_diversity(pop, toolbox, diversity_rate)
             stagnation_counter = 0
 
         # Ensure all individuals have their fitness values calculated
@@ -174,30 +173,32 @@ def run_island(toolbox, ngen, cxpb, mutpb, island_id):
 
         # Extract statistics for the current generation
         record = stats.compile(pop)
+        #if gen % migration_interval == 0:
+        #    print(f"Island {island_id} - Generation: {gen}, avg: {record['avg']}, min: {record['min']}, max: {record['max']}")
         previous_best_fitness = current_best_fitness
-
-        if gen % MIGRATION_INTERVAL == 0:
-            print(f"Island {island_id} - Generation: {gen}, avg: {record['avg']}, min: {record['min']}, max: {record['max']}")
 
     return pop, hof
 
-def main():
+def main(cxpb = 0.5, mutpb=0.1, block_size=4, tournament_size=3, stagnation_threshold=5, diversity_rate=0.4, num_islands=6, migration_rate=0.1, migration_interval=10):
 
-    with Pool(NUM_ISLANDS) as pool:
-        results = [pool.apply_async(run_island, (toolbox, NGEN, CXPB, MUTPB, i)) for i in range(NUM_ISLANDS)]
+    toolbox = set_deap_framework(block_size, tournament_size, mutpb)
+
+    with Pool(num_islands) as pool:
+        results = [pool.apply_async(run_island, (toolbox, NGEN, cxpb, mutpb, i, num_islands, stagnation_threshold, diversity_rate, migration_interval)) for i in range(num_islands)]
         populations_hofs = [result.get() for result in results]
         populations = [pop for pop, hof in populations_hofs]
         hofs = [hof for pop, hof in populations_hofs]
 
         for gen in range(NGEN):
-            if gen % MIGRATION_INTERVAL == 0:
-                migrate(populations, MIGRATION_RATE)
+            if gen % migration_interval == 0:
+                migrate(populations, migration_rate)
 
     best_individuals = [hof[0] for hof in hofs]
     best_individual = min(best_individuals, key=lambda ind: ind.fitness.values)
     print(f"Best Fitness Value: {best_individual.fitness.values}")
     print(f"Best Puzzle: {best_individual}")
     write_output_file(best_individual)
+    return best_individual.fitness.values[0]
 
 if __name__ == "__main__":
     start_time = time.time()
