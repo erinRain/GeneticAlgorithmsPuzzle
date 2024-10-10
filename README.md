@@ -1,3 +1,10 @@
+# Quick Setup
+- download the project
+- in the project's terminal (population_size can be anything in [100,1000], num_generation [1,100]): 
+```
+python island.py --population_size 1000 --num_generation 100
+```
+
 # Instructions 
 - solve an 8x8 square puzzle containing 64 square pieces
 - each tile has 4 sides and represented by 4 numbers
