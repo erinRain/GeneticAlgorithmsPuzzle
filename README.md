@@ -1,9 +1,16 @@
+### Erin Rainville - 40179308
+
 # Quick Setup
-- download the project
-- in the project's terminal (population_size can be anything in [100,1000], num_generation [1,100]): 
+1. download the project
+2. ensure python is downloaded, in project terminal, should show the version you are using:
 ```
-python island.py --population_size 1000 --num_generation 100
+python --version
 ```
+3. in the project's terminal (population_size can be anything in [100,1000], num_generation [1,100]):  
+```
+python Ass1Python.py --population_size 1000 --num_generation 100
+```
+3. or in Ass1Python.py click on Run Ass1Python from line "if __name__ == "__main__":"
 
 # Instructions 
 - solve an 8x8 square puzzle containing 64 square pieces
@@ -49,15 +56,15 @@ python island.py --population_size 1000 --num_generation 100
 
 # Structure
 
-| Step                  | Functions                  | Strategy                                                                 | Input Parameters          |
-|-----------------------|----------------------------|--------------------------------------------------------------------------|---------------------------|
-| **Initialization**    | Read_input_file <br> Set_initial_puzzle <br> Rotate_piece <br> Toolbox.population          | Randomly shuffle and rotate the 64 pieces in Ass1Input.txt               | INPUT_FILENAME <br> POPULATION_SIZE <br> Pieces_list <br> Piece            |
-| **Parent Selection**  | Tools.setTournament        | Running tournaments amongst a random subpopulation and the best individual from each tournament is a parent | TOURNAMENT_SIZE           |
-| **Recombination**     | Block_crossover <br> Dynamic_cxpb_adaptive            | Selects a random block within puzzle and swaps it between parents. <br> Probability of crossover depends on current fitness (worse or equal fitness increases cxpb)      | Parent1 <br> Parent2 <br> BLOCK_SIZE <br> Prev_fitness <br> Current_fitness  <cxpb>                    |
-| **Mutation**          | Mutate_puzzle <br> Dynamic_mutpb_adaptive             | Randomly replaces pieces in puzzle with random, rotated piece from original pieces <br> Probability of mutation depends on current fitness (worse or equal fitness increases mutpb)| Puzzle <br> Prev_fitness <br> Current_fitness <br> mutpb                   |
-| **Survivor Selection**| algorithms.eaMuCommaLambda | (mu, lambda) selection: choose best of children pool                     | population_size <br> LAMBDA <br> num_generation                       |
-| **Termination Conditions** | Main                  | If best fitness is 0 (minimization problem)  <br> Loop until number of generations is reached                             |                       |
-| **Stagnation mitigation** | Increase_diversity     | If population becomes stagnant, replace some random puzzles with new puzzles created from original pieces | Population <br> Toolbox <br> Diversity_rate <br> STAGNATION_THRESHOLD             |
+| Step                       | Functions                                                                         | Strategy                                                                                                                                                                            | Input Parameters                                                                    |
+|----------------------------|-----------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|
+| **Initialization**         | Read_input_file <br> Set_initial_puzzle <br> Rotate_piece <br> Toolbox.population | Randomly shuffle and rotate the 64 pieces in Ass1Input.txt                                                                                                                          | INPUT_FILENAME <br> population_size <br> Pieces_list <br> Piece                     |
+| **Parent Selection**       | Tools.setTournament                                                               | Running tournaments amongst a random subpopulation and the best individual from each tournament is a parent                                                                         | tournament_size                                                                     |
+| **Recombination**          | Block_crossover <br> Dynamic_cxpb_adaptive                                        | Selects a random block within puzzle and swaps it between parents. <br> Probability of crossover depends on current fitness (worse or equal fitness increases cxpb)                 | Parent1 <br> Parent2 <br> block_size <br> Prev_fitness <br> current_fitness  <cxpb> |
+| **Mutation**               | Mutate_puzzle <br> Dynamic_mutpb_adaptive                                         | Randomly replaces pieces in puzzle with random, rotated piece from original pieces <br> Probability of mutation depends on current fitness (worse or equal fitness increases mutpb) | Puzzle <br> Prev_fitness <br> Current_fitness <br> mutpb                            |
+| **Survivor Selection**     | algorithms.eaMuCommaLambda                                                        | (mu, lambda) selection: choose best of children pool                                                                                                                                | population_size <br> LAMBDA <br> num_generation                                     |
+| **Termination Conditions** | Main                                                                              | If best fitness is 0 (minimization problem)  <br> Loop until number of generations is reached                                                                                       |                                                                                     |
+| **Stagnation mitigation**  | Increase_diversity                                                                | If population becomes stagnant, replace some random puzzles with new puzzles created from original pieces                                                                           | Population <br> Toolbox <br> Diversity_rate <br> stagnation_threshold               |
 
 # Results
 After pamater tuning, the final inputs with population_size 1000 and num_generation 100 are:

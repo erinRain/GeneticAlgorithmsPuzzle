@@ -1,5 +1,7 @@
 # Erin Rainville - 40179308
-# fitness evaluation of mismatched row using the fitness.cpp file given by professor
+# fitness evaluation of mismatched row using the fitness.cpp file given in assignment instructions
+    # changed it to python
+ # input_data is a list of strings
 
 def count_row_mismatches(first, second):
     number_of_mismatches = 0
@@ -36,7 +38,3 @@ def main(input_data):
 
     return number_of_mismatches
 
-if __name__ == "__main__":
-    import sys
-    input_data = sys.argv[1:]
-    main(input_data)
