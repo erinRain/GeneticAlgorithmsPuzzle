@@ -4,14 +4,13 @@ import fitness
 from typing import List, Tuple
 from multiprocessing import Pool
 import time
+import argparse
 
-# Unchanging Parameters
+
+#Files
 INPUT_FILENAME = "Ass1Input.txt"
 OUTPUT_FILENAME = "OutputFiles/Ass1Output.txt"
-POPULATION_SIZE = 1000
-NGEN = 100  # Number of generations
-LAMBDA = POPULATION_SIZE  # Number of children to produce at each generation
-MU = LAMBDA//2  # Number of individuals to select for the next generation
+
 
 # Read input file and create an array of the pieces
 def read_input_file() -> List[str]:
@@ -121,8 +120,8 @@ def migrate(populations, migration_rate):
         populations[next_island].extend(migrants)
         populations[i] = [ind for ind in populations[i] if ind not in migrants]
 
-def run_island(toolbox, ngen, cxpb, mutpb, island_id, num_islands, stagnation_threshold, diversity_rate, migration_interval):
-    pop = toolbox.population(n=POPULATION_SIZE // num_islands)
+def run_island(toolbox, population_size, ngen, LAMBDA, cxpb, mutpb, island_id, num_islands, stagnation_threshold, diversity_rate, migration_interval):
+    pop = toolbox.population(n=population_size // num_islands)
     hof = tools.HallOfFame(1)
 
     stats = tools.Statistics(lambda ind: ind.fitness.values)
@@ -147,7 +146,7 @@ def run_island(toolbox, ngen, cxpb, mutpb, island_id, num_islands, stagnation_th
             cxpb /= total
             mutpb /= total
 
-        pop, log = algorithms.eaMuCommaLambda(pop, toolbox, mu=MU, lambda_=LAMBDA, cxpb=cxpb, mutpb=mutpb, ngen=1,
+        pop, log = algorithms.eaMuCommaLambda(pop, toolbox, mu=population_size, lambda_=LAMBDA, cxpb=cxpb, mutpb=mutpb, ngen=1,
                                               stats=stats, halloffame=hof, verbose=False)
 
         current_best_fitness = hof[0].fitness.values[0]
@@ -173,23 +172,25 @@ def run_island(toolbox, ngen, cxpb, mutpb, island_id, num_islands, stagnation_th
 
         # Extract statistics for the current generation
         record = stats.compile(pop)
-        #if gen % migration_interval == 0:
-        #    print(f"Island {island_id} - Generation: {gen}, avg: {record['avg']}, min: {record['min']}, max: {record['max']}")
+        if gen % migration_interval == 0:
+            print(f"Island {island_id} - Generation: {gen}, avg: {record['avg']}, min: {record['min']}, max: {record['max']}")
         previous_best_fitness = current_best_fitness
 
     return pop, hof
 
-def main(cxpb = 0.5, mutpb=0.1, block_size=4, tournament_size=3, stagnation_threshold=5, diversity_rate=0.4, num_islands=6, migration_rate=0.1, migration_interval=10):
+def main(cxpb = 0.5, mutpb=0.1, block_size=4, tournament_size=3, lambda_multiplier = 2, stagnation_threshold=5, diversity_rate=0.4, num_islands=6, migration_rate=0.1, migration_interval=10, population_size = 1000, num_generation = 100):
+    print(f"Running with population size: {population_size} and number of generations: {num_generation}")
 
+    LAMBDA = population_size * lambda_multiplier  # Number of children to produce at each generation
     toolbox = set_deap_framework(block_size, tournament_size, mutpb)
 
     with Pool(num_islands) as pool:
-        results = [pool.apply_async(run_island, (toolbox, NGEN, cxpb, mutpb, i, num_islands, stagnation_threshold, diversity_rate, migration_interval)) for i in range(num_islands)]
+        results = [pool.apply_async(run_island, (toolbox, population_size, num_generation, LAMBDA, cxpb, mutpb, i, num_islands, stagnation_threshold, diversity_rate, migration_interval)) for i in range(num_islands)]
         populations_hofs = [result.get() for result in results]
         populations = [pop for pop, hof in populations_hofs]
         hofs = [hof for pop, hof in populations_hofs]
 
-        for gen in range(NGEN):
+        for gen in range(num_generation):
             if gen % migration_interval == 0:
                 migrate(populations, migration_rate)
 
@@ -200,7 +201,30 @@ def main(cxpb = 0.5, mutpb=0.1, block_size=4, tournament_size=3, stagnation_thre
     write_output_file(best_individual)
     return best_individual.fitness.values[0]
 
+def get_valid_input(prompt, valid_range):
+    while True:
+        try:
+            value = int(input(prompt))
+            if value in valid_range:
+                return value
+            else:
+                print(f"Value must be within the range {valid_range.start} to {valid_range.stop - 1}. Please try again.")
+        except ValueError:
+            print("Invalid input. Please enter an integer.")
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Evolutionary Algorithm Parameters")
+    parser.add_argument("--population_size", type=int, help="Population size (in [100, 1000])")
+    parser.add_argument("--num_generation", type=int, help="Number of generations (in [1, 100])")
+
+    args = parser.parse_args()
+
+    if args.population_size is None or not (100 <= args.population_size <= 1000):
+        args.population_size = get_valid_input("Enter population size (in [100, 1000]): ", range(100, 1001))
+    if args.num_generation is None or not (1 <= args.num_generation <= 100):
+        args.num_generation = get_valid_input("Enter number of generations (in [1, 100]): ", range(1, 101))
+
     start_time = time.time()
-    main()
-    print("Time: %s" % (time.time() - start_time))
+    main(population_size=args.population_size, num_generation=args.num_generation)
+    print("Time taken to do algorithm: %s" % (time.time() - start_time))
+    print("The output can be found in GeneticAlgorithmsPuzzle\OutputFiles\Ass1Output.txt")
